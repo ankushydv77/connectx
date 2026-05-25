@@ -11,6 +11,8 @@ export const metadata: Metadata = {
   keywords: "chat, video call, webrtc, socket.io, real-time, connectx",
 };
 
+import Navbar from "./components/Navbar";
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -18,7 +20,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${inter.className} antialiased`}>{children}</body>
+      <body className={`${inter.className} antialiased`}>
+        <Navbar />
+        <div className="pt-28">{children}</div>
+      </body>
     </html>
   );
 }

@@ -53,62 +53,8 @@ export default function Home() {
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-[600px] bg-indigo-600/10 blur-[120px] rounded-full pointer-events-none" />
       <div className="absolute bottom-0 right-0 w-[600px] h-[600px] bg-cyan-600/10 blur-[120px] rounded-full pointer-events-none" />
 
-      {/* Navbar */}
-      <nav className="fixed w-full z-50 glass border-b-0 border-indigo-200">
-        <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-cyan-500 flex items-center justify-center font-bold text-xl shadow-lg shadow-indigo-500/25 text-white">
-              C
-            </div>
-            <span className="text-xl font-bold tracking-tight text-indigo-600">
-              CONNECTX
-            </span>
-          </div>
-          <div className="hidden md:flex items-center gap-8 text-sm font-medium text-slate-700">
-            <Link
-              href="/features"
-              className="hover:text-indigo-600 transition-colors font-medium"
-            >
-              Features
-            </Link>
-            <Link
-              href="/how-it-works"
-              className="hover:text-indigo-600 transition-colors font-medium"
-            >
-              How it works
-            </Link>
-            <Link
-              href="/about"
-              className="hover:text-indigo-600 transition-colors font-medium"
-            >
-              About
-            </Link>
-            <Link
-              href="/meet"
-              className="hover:text-indigo-600 transition-colors font-medium"
-            >
-              Meet
-            </Link>
-          </div>
-          <div className="flex items-center gap-4">
-            <Link
-              href="/login"
-              className="text-sm font-medium text-slate-700 hover:text-indigo-600 transition-colors"
-            >
-              Login
-            </Link>
-            <Link
-              href="/register"
-              className="text-sm font-medium bg-gradient-to-r from-indigo-600 to-cyan-500 text-white px-5 py-2.5 rounded-full hover:shadow-lg hover:shadow-indigo-200 transition-all transform hover:scale-105 active:scale-95"
-            >
-              Sign Up
-            </Link>
-          </div>
-        </div>
-      </nav>
-
       {/* Hero Section */}
-      <main className="pt-32 pb-20 px-6">
+      <main className="pb-20 px-6">
         <div className="max-w-7xl mx-auto">
           <div className="flex flex-col items-center text-center mt-20 mb-32">
             <motion.div
