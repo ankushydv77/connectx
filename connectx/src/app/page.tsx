@@ -66,22 +66,28 @@ export default function Home() {
           </div>
           <div className="hidden md:flex items-center gap-8 text-sm font-medium text-slate-700">
             <Link
-              href="#features"
+              href="/features"
               className="hover:text-indigo-600 transition-colors font-medium"
             >
               Features
             </Link>
             <Link
-              href="#how-it-works"
+              href="/how-it-works"
               className="hover:text-indigo-600 transition-colors font-medium"
             >
               How it works
             </Link>
             <Link
-              href="#about"
+              href="/about"
               className="hover:text-indigo-600 transition-colors font-medium"
             >
               About
+            </Link>
+            <Link
+              href="/meet"
+              className="hover:text-indigo-600 transition-colors font-medium"
+            >
+              Meet
             </Link>
           </div>
           <div className="flex items-center gap-4">
@@ -155,6 +161,12 @@ export default function Home() {
                 <Video className="w-5 h-5" />
                 Try Video Call
               </button>
+              <Link
+                href="/meet"
+                className="px-8 py-4 rounded-full bg-slate-900 text-white font-medium hover:bg-slate-800 transition-all flex items-center justify-center gap-2"
+              >
+                Meet Hub
+              </Link>
             </motion.div>
           </div>
 

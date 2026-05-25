@@ -498,7 +498,6 @@ export default function DemoCallPage() {
                 ref={remoteVideoRef}
                 autoPlay
                 playsInline
-                decoding="auto"
                 className="w-full h-full object-cover"
               />
               {!isConnected && (
@@ -535,7 +534,6 @@ export default function DemoCallPage() {
                 autoPlay
                 playsInline
                 muted
-                decoding="auto"
                 className={`w-full h-full object-cover ${!isVideoOn && !isScreenSharing ? "opacity-0" : "opacity-100"}`}
               />
 
