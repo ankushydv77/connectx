@@ -5,10 +5,9 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
 export const metadata: Metadata = {
-  title: "CONNECTX | Real-time Communication Platform",
-  description:
-    "Experience crystal-clear video calls, instant messaging, and AI-powered real-time translation all in one powerful platform.",
-  keywords: "chat, video call, webrtc, socket.io, real-time, connectx",
+  title: "Google Meet Clone",
+  description: "A simplified Google Meet clone built with Next.js.",
+  keywords: "google meet clone, video call, meeting, next.js",
 };
 
 import Navbar from "./components/Navbar";

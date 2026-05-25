@@ -1,156 +1,232 @@
 "use client";
 
-import { useState } from "react";
-import Link from "next/link";
+import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 
 export default function MeetPage() {
-  const [meetingCode, setMeetingCode] = useState("");
-  const [generatedCode, setGeneratedCode] = useState("");
+  const router = useRouter();
+  const [room, setRoom] = useState("");
+  const [name, setName] = useState("");
+  
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    setRoom(params.get("room") || "");
+  }, []);
+  const [joined, setJoined] = useState(false);
+  const [cameraOn, setCameraOn] = useState(true);
+  const [micOn, setMicOn] = useState(true);
+  const [message, setMessage] = useState("");
+  const [copyStatus, setCopyStatus] = useState("");
+  const videoRef = useRef<HTMLVideoElement>(null);
 
-  const openZoom = () => {
-    if (!meetingCode) {
-      alert("Enter a Zoom meeting ID or full link to continue.");
+  useEffect(() => {
+    let stream: MediaStream | null = null;
+
+    if (joined && cameraOn) {
+      navigator.mediaDevices
+        .getUserMedia({ video: true, audio: micOn })
+        .then((media) => {
+          stream = media;
+          if (videoRef.current) {
+            videoRef.current.srcObject = media;
+            videoRef.current.play().catch(() => null);
+          }
+        })
+        .catch(() => {
+          setMessage("Camera access denied or unavailable.");
+          setCameraOn(false);
+        });
+    }
+
+    return () => {
+      if (stream) {
+        stream.getTracks().forEach((track) => track.stop());
+      }
+    };
+  }, [joined, cameraOn, micOn]);
+
+  const handleJoin = () => {
+    if (!room.trim()) {
+      alert("Enter a meeting code or open this page with a room query.");
       return;
     }
-    const url = meetingCode.startsWith("http")
-      ? meetingCode
-      : `https://zoom.us/j/${meetingCode}`;
-    window.open(url, "_blank");
-  };
-
-  const openGoogleMeet = () => {
-    if (!meetingCode) {
-      alert("Enter a Google Meet code or link to continue.");
+    if (!name.trim()) {
+      alert("Enter your name to join.");
       return;
     }
-    const code = meetingCode.includes("meet.google.com")
-      ? meetingCode
-      : `https://meet.google.com/${meetingCode}`;
-    window.open(code, "_blank");
+    setJoined(true);
+    setMessage("Waiting for meeting participants...");
   };
 
-  const generateCode = () => {
-    const code = Array.from({ length: 10 }, () =>
-      Math.random().toString(36).charAt(2),
-    ).join("");
-    setGeneratedCode(code.toUpperCase());
-    setMeetingCode(code);
+  const handleLeave = () => {
+    setJoined(false);
+    setMessage("You have left the meeting.");
+    if (videoRef.current) {
+      const stream = videoRef.current.srcObject as MediaStream | null;
+      if (stream) {
+        stream.getTracks().forEach((track) => track.stop());
+      }
+      videoRef.current.srcObject = null;
+    }
+  };
+
+  const copyLink = async () => {
+    const url = `${window.location.origin}/meet?room=${encodeURIComponent(room)}`;
+    await navigator.clipboard.writeText(url);
+    setCopyStatus("Link copied!");
+    window.setTimeout(() => setCopyStatus(""), 2000);
   };
 
   return (
-    <main className="min-h-screen bg-slate-50 text-slate-900 py-16 px-6">
-      <div className="max-w-5xl mx-auto">
-        <div className="text-center mb-12">
-          <p className="text-sm uppercase tracking-[0.35em] text-indigo-600 font-semibold mb-4">
-            Meeting tools
-          </p>
-          <h1 className="text-4xl md:text-5xl font-extrabold mb-4">
-            Launch a Zoom or Google Meet session with one click.
-          </h1>
-          <p className="text-slate-700 max-w-2xl mx-auto">
-            Use CONNECTX as your meeting hub. Enter a code, paste a link, or
-            generate a quick meeting reference to share with your team.
-          </p>
-        </div>
-
-        <section className="glass border border-indigo-200 rounded-3xl p-10 shadow-xl mb-10">
-          <div className="grid gap-8 lg:grid-cols-2">
+    <main className="min-h-screen bg-slate-950 text-white px-6 pb-16">
+      <div className="max-w-6xl mx-auto pt-8">
+        <div className="rounded-[32px] border border-white/10 bg-slate-900/80 p-8 shadow-2xl shadow-slate-950/40">
+          <div className="mb-8 flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <h2 className="text-2xl font-semibold mb-4">
-                Join external meetings
-              </h2>
-              <p className="text-slate-700 leading-7 mb-6">
-                Paste a Zoom meeting ID or Google Meet code and open the session
-                in a new tab. CONNECTX helps you keep meeting links organized
-                alongside your chat and profile.
+              <p className="text-sm uppercase tracking-[0.35em] text-cyan-300 mb-2">Meeting room</p>
+              <h1 className="text-4xl font-semibold tracking-tight">{room || "New meeting"}</h1>
+              <p className="mt-3 text-slate-400 max-w-2xl">
+                A simplified Google Meet clone meeting page. Enter your name,
+                turn on your camera, and join the room.
               </p>
-              <label className="block text-sm font-medium text-slate-900 mb-3">
-                Meeting code or URL
-              </label>
-              <input
-                value={meetingCode}
-                onChange={(event) => setMeetingCode(event.target.value)}
-                placeholder="e.g. 1234567890 or abc-defg-hij"
-                className="w-full rounded-3xl border border-slate-300 px-5 py-4 text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              />
-              <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-                <button
-                  onClick={openZoom}
-                  className="rounded-full bg-indigo-600 px-6 py-3 text-white font-semibold hover:bg-indigo-700 transition"
-                >
-                  Open Zoom
-                </button>
-                <button
-                  onClick={openGoogleMeet}
-                  className="rounded-full bg-cyan-600 px-6 py-3 text-white font-semibold hover:bg-cyan-700 transition"
-                >
-                  Open Google Meet
-                </button>
-              </div>
             </div>
-            <div className="rounded-3xl bg-indigo-600/10 p-6">
-              <h3 className="text-xl font-semibold mb-4">
-                Quick meeting helper
-              </h3>
-              <p className="text-slate-700 leading-7 mb-6">
-                Generate a simple join code in seconds, then copy it to share
-                with your participants. Perfect for quick meetups and remote
-                classes.
-              </p>
-              <div className="mb-6 rounded-3xl bg-white p-4 border border-slate-200">
-                <p className="text-sm uppercase tracking-[0.35em] text-slate-500 mb-2">
-                  Generated code
-                </p>
-                <p className="text-2xl font-semibold text-slate-900">
-                  {generatedCode || "-"}
-                </p>
-              </div>
+            <div className="flex flex-wrap gap-3">
               <button
-                onClick={generateCode}
-                className="rounded-full border border-indigo-500 px-6 py-3 bg-white text-slate-900 font-semibold hover:bg-indigo-50 transition"
+                type="button"
+                onClick={() => router.push("/")}
+                className="rounded-full border border-white/10 bg-white/5 px-5 py-3 text-sm text-slate-100 hover:bg-white/10 transition"
               >
-                Generate meeting code
+                Home
+              </button>
+              <button
+                type="button"
+                onClick={copyLink}
+                className="rounded-full bg-cyan-500 px-5 py-3 text-sm font-semibold text-slate-950 hover:bg-cyan-400 transition"
+              >
+                Copy join link
               </button>
             </div>
           </div>
-        </section>
 
-        <div className="grid gap-8 lg:grid-cols-2">
-          <div className="glass border border-indigo-200 rounded-3xl p-8 shadow-xl">
-            <h2 className="text-2xl font-semibold mb-4">
-              In-app video experience
-            </h2>
-            <p className="text-slate-700 leading-7 mb-6">
-              Want a built-in call instead? Use the native CONNECTX video call
-              tool to connect directly with your camera and microphone.
-            </p>
-            <Link
-              href="/demo"
-              className="inline-flex items-center justify-center rounded-full bg-slate-900 text-white px-6 py-3 font-semibold hover:bg-slate-800 transition"
-            >
-              Start in-app call
-            </Link>
-          </div>
+          {!joined && (
+            <div className="grid gap-8 lg:grid-cols-[1.4fr_1fr]">
+              <div className="space-y-6 rounded-[28px] border border-white/10 bg-slate-950/70 p-6">
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-3">
+                    Your name
+                  </label>
+                  <input
+                    value={name}
+                    onChange={(event) => setName(event.target.value)}
+                    placeholder="Enter your name"
+                    className="w-full rounded-3xl border border-white/10 bg-slate-900/90 px-4 py-4 text-white outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20"
+                  />
+                </div>
 
-          <div className="glass border border-indigo-200 rounded-3xl p-8 shadow-xl">
-            <h2 className="text-2xl font-semibold mb-4">
-              Meeting notes & invite
-            </h2>
-            <p className="text-slate-700 leading-7 mb-6">
-              Copy the generated meeting code or paste an existing link so your
-              guests can join quickly from any browser.
-            </p>
-            <div className="rounded-3xl bg-white p-6 border border-slate-200">
-              <p className="text-sm text-slate-500 mb-2">
-                Meeting link preview
-              </p>
-              <div className="rounded-2xl border border-slate-300 bg-slate-50 p-4 text-slate-700">
-                {meetingCode
-                  ? meetingCode
-                  : "Enter a link or code above and choose Zoom or Meet."}
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <button
+                    type="button"
+                    onClick={() => setCameraOn((current) => !current)}
+                    className={`rounded-3xl px-5 py-4 text-sm font-medium transition ${cameraOn ? "bg-cyan-500 text-slate-950" : "bg-white/5 text-slate-200 hover:bg-white/10"}`}
+                  >
+                    {cameraOn ? "Camera on" : "Camera off"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setMicOn((current) => !current)}
+                    className={`rounded-3xl px-5 py-4 text-sm font-medium transition ${micOn ? "bg-cyan-500 text-slate-950" : "bg-white/5 text-slate-200 hover:bg-white/10"}`}
+                  >
+                    {micOn ? "Mic on" : "Mic off"}
+                  </button>
+                </div>
+
+                <div className="rounded-3xl border border-white/10 bg-slate-900/80 p-5">
+                  <p className="text-sm uppercase tracking-[0.35em] text-slate-400 mb-3">Meeting details</p>
+                  <div className="text-sm text-slate-300 space-y-2">
+                    <p>
+                      <span className="text-slate-400">Room:</span> {room || "No code provided"}
+                    </p>
+                    <p>
+                      <span className="text-slate-400">Status:</span> Waiting to join
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleJoin}
+                  className="w-full rounded-full bg-white px-6 py-4 text-sm font-semibold text-slate-950 hover:bg-slate-100 transition"
+                >
+                  Join meeting
+                </button>
+              </div>
+
+              <div className="rounded-[28px] border border-white/10 bg-slate-950/80 p-6">
+                <p className="text-sm uppercase tracking-[0.35em] text-slate-400 mb-4">Preview</p>
+                <div className="aspect-video overflow-hidden rounded-3xl bg-slate-900">
+                  <video ref={videoRef} className="h-full w-full object-cover bg-slate-950" muted />
+                </div>
+                <p className="mt-4 text-sm text-slate-400">
+                  Toggle your camera and microphone before joining. Your local preview shows here.
+                </p>
               </div>
             </div>
-          </div>
+          )}
+
+          {joined && (
+            <div className="space-y-6">
+              <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
+                <div className="rounded-[28px] border border-white/10 bg-slate-950/80 p-6">
+                  <p className="text-sm uppercase tracking-[0.35em] text-slate-400 mb-4">You are in the meeting</p>
+                  <div className="aspect-video overflow-hidden rounded-3xl bg-slate-900">
+                    <video ref={videoRef} className="h-full w-full object-cover bg-slate-950" muted />
+                  </div>
+                </div>
+
+                <div className="rounded-[28px] border border-white/10 bg-slate-950/80 p-6">
+                  <p className="text-sm uppercase tracking-[0.35em] text-slate-400 mb-4">Meeting controls</p>
+                  <div className="flex flex-col gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setCameraOn((value) => !value)}
+                      className="rounded-3xl border border-white/10 bg-white/5 px-5 py-4 text-sm text-slate-200 hover:bg-white/10 transition"
+                    >
+                      {cameraOn ? "Turn camera off" : "Turn camera on"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setMicOn((value) => !value)}
+                      className="rounded-3xl border border-white/10 bg-white/5 px-5 py-4 text-sm text-slate-200 hover:bg-white/10 transition"
+                    >
+                      {micOn ? "Mute microphone" : "Unmute microphone"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleLeave}
+                      className="rounded-3xl bg-rose-500 px-5 py-4 text-sm font-semibold text-white hover:bg-rose-400 transition"
+                    >
+                      Leave meeting
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <div className="rounded-[28px] border border-white/10 bg-slate-950/80 p-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-sm text-slate-400">Meeting link</p>
+                  <p className="mt-2 break-all text-slate-200">{`${window.location.origin}/meet?room=${encodeURIComponent(room)}`}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={copyLink}
+                  className="rounded-full bg-cyan-500 px-5 py-3 text-sm font-semibold text-slate-950 hover:bg-cyan-400 transition"
+                >
+                  {copyStatus || "Copy meeting link"}
+                </button>
+              </div>
+              {message && <p className="text-sm text-slate-400">{message}</p>}
+            </div>
+          )}
         </div>
       </div>
     </main>
