@@ -16,6 +16,7 @@ import {
   X,
   Check,
 } from "lucide-react";
+import { getCurrentUser, logoutUser, setCurrentUser } from "@/lib/auth";
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -33,17 +34,16 @@ export default function ProfilePage() {
   });
 
   useEffect(() => {
-    const storedUser = localStorage.getItem("user");
-    if (storedUser) {
-      const userData = JSON.parse(storedUser);
-      setUser(userData);
+    const loggedInUser = getCurrentUser();
+    if (loggedInUser) {
+      setUser(loggedInUser);
       setFormData({
-        name: userData.name || "",
-        email: userData.email || "",
-        phone: userData.phone || "",
-        location: userData.location || "",
+        name: loggedInUser.name || "",
+        email: loggedInUser.email || "",
+        phone: loggedInUser.phone || "",
+        location: loggedInUser.location || "",
       });
-      setProfileImage(userData.profileImage || "");
+      setProfileImage(loggedInUser.avatar || ""); // avatar is used for profile images in lib/auth types
     } else {
       router.push("/login");
     }
@@ -74,9 +74,9 @@ export default function ProfilePage() {
       const updatedUser = {
         ...user,
         ...formData,
-        profileImage,
+        avatar: profileImage,
       };
-      localStorage.setItem("user", JSON.stringify(updatedUser));
+      setCurrentUser(updatedUser);
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
     } catch (error) {
@@ -87,7 +87,7 @@ export default function ProfilePage() {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem("user");
+    logoutUser();
     router.push("/login");
   };
 

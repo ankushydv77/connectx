@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { getCurrentUser, loginUser } from "@/lib/auth";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -11,29 +12,23 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
 
+  useEffect(() => {
+    const currentUser = getCurrentUser();
+    if (currentUser) {
+      router.push("/dashboard");
+    }
+  }, [router]);
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setError("");
 
     try {
-      const res = await fetch("http://localhost:5000/api/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.error || "Failed to login");
-      }
-
-      // Save user to local storage and redirect
-      localStorage.setItem("user", JSON.stringify(data.user));
+      await loginUser(email.trim(), password);
       router.push("/dashboard");
     } catch (err: any) {
-      setError(err.message);
+      setError(err.message || "Failed to login");
     } finally {
       setIsLoading(false);
     }

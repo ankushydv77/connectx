@@ -134,6 +134,72 @@ app.get('/api/users', async (req, res) => {
   }
 });
 
+// --- Room & Participant Management ---
+const rooms = new Map(); // roomId -> { participants: Map, host, createdAt }
+
+function createRoom(roomId, userId, userName, userEmail) {
+  if (!rooms.has(roomId)) {
+    rooms.set(roomId, {
+      participants: new Map(),
+      host: userId,
+      createdAt: new Date(),
+      waitingList: new Map(),
+    });
+  }
+  return rooms.get(roomId);
+}
+
+function addParticipant(roomId, socketId, userId, userName, userEmail) {
+  const room = rooms.get(roomId);
+  if (room) {
+    room.participants.set(socketId, {
+      userId,
+      userName,
+      userEmail,
+      socketId,
+      joinedAt: new Date(),
+      isMuted: false,
+      isVideoOff: false,
+    });
+  }
+}
+
+function addToWaitingList(roomId, socketId, userId, userName, userEmail) {
+  const room = rooms.get(roomId);
+  if (room) {
+    room.waitingList.set(socketId, {
+      userId,
+      userName,
+      userEmail,
+      socketId,
+      requestedAt: new Date(),
+    });
+  }
+}
+
+function removeParticipant(roomId, socketId) {
+  const room = rooms.get(roomId);
+  if (room) {
+    room.participants.delete(socketId);
+    room.waitingList.delete(socketId);
+    if (room.participants.size === 0 && room.waitingList.size === 0) {
+      rooms.delete(roomId);
+    }
+  }
+}
+
+function getRoomParticipants(roomId) {
+  const room = rooms.get(roomId);
+  if (!room) return [];
+  return Array.from(room.participants.values());
+}
+
+function getWaitingList(roomId) {
+  const room = rooms.get(roomId);
+  if (!room) return [];
+  return Array.from(room.waitingList.values());
+}
+
 // --- Socket.io ---
 io.on('connection', (socket) => {
   console.log(`User connected: ${socket.id}`);
@@ -146,11 +212,91 @@ io.on('connection', (socket) => {
     socket.broadcast.emit('typing');
   });
 
-  socket.on('join_room', (roomId) => {
-    socket.join(roomId);
-    socket.to(roomId).emit('user_joined', socket.id);
+  // Meeting room functionality
+  socket.on('join_room', (data) => {
+    const { roomId, userId, userName, userEmail, requiresApproval } = data;
+
+    const room = createRoom(roomId, userId, userName, userEmail);
+
+    if (requiresApproval && userId !== room.host) {
+      // Add to waiting list if approval required
+      addToWaitingList(roomId, socket.id, userId, userName, userEmail);
+      io.to(roomId).emit('waiting_participant', {
+        socketId: socket.id,
+        userName,
+        userEmail,
+      });
+      socket.emit('waiting_for_approval', {
+        roomId,
+        message: 'Waiting for host approval',
+      });
+    } else {
+      // Direct join
+      addParticipant(roomId, socket.id, userId, userName, userEmail);
+      socket.join(roomId);
+
+      // Notify others in room
+      socket.to(roomId).emit('participant_joined', {
+        socketId: socket.id,
+        userName,
+        participants: getRoomParticipants(roomId),
+      });
+
+      // Send current room state to new participant
+      socket.emit('room_state', {
+        participants: getRoomParticipants(roomId),
+        roomId,
+      });
+    }
   });
 
+  socket.on('approve_participant', (data) => {
+    const { roomId, socketId } = data;
+    const room = rooms.get(roomId);
+
+    if (room && room.waitingList.has(socketId)) {
+      const participant = room.waitingList.get(socketId);
+      room.waitingList.delete(socketId);
+      room.participants.set(socketId, {
+        ...participant,
+        joinedAt: new Date(),
+        isMuted: false,
+        isVideoOff: false,
+      });
+
+      // Join the approved guest to the socket.io room channel
+      const guestSocket = io.sockets.sockets.get(socketId);
+      if (guestSocket) {
+        guestSocket.join(roomId);
+      }
+
+      io.to(socketId).emit('approval_granted', {
+        roomId,
+        participants: getRoomParticipants(roomId),
+      });
+
+      io.to(roomId).emit('participant_joined', {
+        socketId,
+        userName: participant.userName,
+        participants: getRoomParticipants(roomId),
+      });
+    }
+  });
+
+  socket.on('reject_participant', (data) => {
+    const { roomId, socketId } = data;
+    const room = rooms.get(roomId);
+
+    if (room && room.waitingList.has(socketId)) {
+      room.waitingList.delete(socketId);
+      io.to(socketId).emit('approval_rejected', {
+        roomId,
+        message: 'Host rejected your meeting request',
+      });
+    }
+  });
+
+  // WebRTC Signaling
   socket.on('offer', (data) => {
     socket.to(data.target).emit('offer', data);
   });
@@ -163,8 +309,125 @@ io.on('connection', (socket) => {
     socket.to(data.target).emit('ice_candidate', data);
   });
 
+  socket.on('update_participant_state', (data) => {
+    const { roomId, isMuted, isVideoOff } = data;
+    const room = rooms.get(roomId);
+
+    if (room && room.participants.has(socket.id)) {
+      const participant = room.participants.get(socket.id);
+      participant.isMuted = isMuted;
+      participant.isVideoOff = isVideoOff;
+
+      io.to(roomId).emit('participant_state_changed', {
+        socketId: socket.id,
+        isMuted,
+        isVideoOff,
+      });
+    }
+  });
+
+  // Caption broadcasting for live translation
+  socket.on('send_caption', (data) => {
+    const { roomId, captionId, speakerId, senderName, originalText, originalLanguage, translations, timestamp } = data;
+
+    const room = rooms.get(roomId);
+    if (!room) return;
+
+    // Broadcast caption to all participants in room
+    io.to(roomId).emit('receive_caption', {
+      captionId,
+      speakerId,
+      senderName,
+      originalText,
+      originalLanguage,
+      translations,
+      timestamp,
+    });
+  });
+
+  // Chat messaging
+  socket.on('send_room_message', (data) => {
+    const { roomId, messageId, text, senderId, senderName, timestamp } = data;
+
+    const room = rooms.get(roomId);
+    if (!room) return;
+
+    // Broadcast message to all participants in room
+    io.to(roomId).emit('receive_room_message', {
+      messageId,
+      senderId,
+      senderName,
+      text,
+      timestamp,
+      isSystemMessage: false,
+    });
+  });
+
+  // Hand raise feature
+  socket.on('raise_hand', (data) => {
+    const { roomId, userId, userName } = data;
+    const room = rooms.get(roomId);
+
+    if (!room) return;
+
+    io.to(roomId).emit('participant_hand_raised', {
+      socketId: socket.id,
+      userId,
+      userName,
+      timestamp: new Date().toISOString(),
+    });
+  });
+
+  socket.on('lower_hand', (data) => {
+    const { roomId, userId } = data;
+    const room = rooms.get(roomId);
+
+    if (!room) return;
+
+    io.to(roomId).emit('participant_hand_lowered', {
+      socketId: socket.id,
+      userId,
+    });
+  });
+
+  // Reaction emojis
+  socket.on('send_reaction', (data) => {
+    const { roomId, emoji, senderName } = data;
+    const room = rooms.get(roomId);
+
+    if (!room) return;
+
+    io.to(roomId).emit('receive_reaction', {
+      emoji,
+      senderName,
+      timestamp: new Date().toISOString(),
+    });
+  });
+
+  socket.on('leave_room', (data) => {
+    const { roomId } = data;
+    removeParticipant(roomId, socket.id);
+    socket.leave(roomId);
+
+    io.to(roomId).emit('participant_left', {
+      socketId: socket.id,
+      participants: getRoomParticipants(roomId),
+    });
+  });
+
   socket.on('disconnect', () => {
     console.log(`User disconnected: ${socket.id}`);
+
+    // Remove from all rooms
+    rooms.forEach((room, roomId) => {
+      if (room.participants.has(socket.id) || room.waitingList.has(socket.id)) {
+        removeParticipant(roomId, socket.id);
+        io.to(roomId).emit('participant_left', {
+          socketId: socket.id,
+          participants: getRoomParticipants(roomId),
+        });
+      }
+    });
   });
 });
 

@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { AuthUser, getCurrentUser, logoutUser } from "@/lib/auth";
 import {
   ArrowLeft,
   Mic,
@@ -42,12 +43,25 @@ export default function DemoCallPage() {
   // UI Toggles
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [isTranslating, setIsTranslating] = useState(false);
+  const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
+  const [remoteConnected, setRemoteConnected] = useState(false);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [roomCode, setRoomCode] = useState("");
 
   // Data State
   const [messages, setMessages] = useState<
-    Array<{ text: string; sender: string; time: string }>
+    Array<{
+      text: string;
+      sender: string;
+      time: string;
+      isFile?: boolean;
+      fileName?: string;
+      fileUrl?: string;
+    }>
   >([]);
   const [chatInput, setChatInput] = useState("");
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [transferNotice, setTransferNotice] = useState("");
   const [caption, setCaption] = useState("");
 
   // Refs
@@ -62,11 +76,18 @@ export default function DemoCallPage() {
   const [dataConn, setDataConn] = useState<any>(null);
 
   useEffect(() => {
-    const storedUser =
-      typeof window !== "undefined" ? localStorage.getItem("user") : null;
+    const storedUser = getCurrentUser();
     if (!storedUser) {
       router.push("/login");
       return;
+    }
+    setCurrentUser(storedUser);
+
+    const params = new URLSearchParams(window.location.search);
+    const roomParam = params.get("room")?.trim();
+    if (roomParam) {
+      setRoomCode(roomParam);
+      setTargetId(roomParam);
     }
 
     // Dynamically import PeerJS so it only runs on the client
@@ -144,6 +165,24 @@ export default function DemoCallPage() {
       } else if (data.type === "caption") {
         setCaption(data.text);
         setTimeout(() => setCaption(""), 4000);
+      } else if (data.type === "file") {
+        const fileUrl = data.fileData;
+        setMessages((prev) => [
+          ...prev,
+          {
+            text: `Received file: ${data.fileName}`,
+            sender: "Peer",
+            time: new Date().toLocaleTimeString([], {
+              hour: "2-digit",
+              minute: "2-digit",
+            }),
+            isFile: true,
+            fileName: data.fileName,
+            fileUrl,
+          },
+        ]);
+        setTransferNotice(`Received ${data.fileName}`);
+        setTimeout(() => setTransferNotice(""), 3000);
       }
     });
     conn.on("close", () => console.log("Data connection closed"));
@@ -151,6 +190,7 @@ export default function DemoCallPage() {
 
   const attachRemoteStream = (remoteStream: MediaStream) => {
     setIsConnected(true);
+    setRemoteConnected(true);
     setIsCalling(false);
     setConnectionStatus("Connected");
 
@@ -158,15 +198,13 @@ export default function DemoCallPage() {
     if (!videoEl) return;
 
     videoEl.srcObject = remoteStream;
-
-    const wasMuted = videoEl.muted;
     videoEl.muted = true;
 
     const playPromise = videoEl.play();
     if (playPromise && typeof playPromise.then === "function") {
       playPromise
         .then(() => {
-          if (!wasMuted) videoEl.muted = false;
+          videoEl.muted = false;
         })
         .catch((e) => console.log("Remote video play error:", e));
     }
@@ -232,6 +270,8 @@ export default function DemoCallPage() {
 
   const endCallCleanup = () => {
     setIsConnected(false);
+    setRemoteConnected(false);
+    setElapsedSeconds(0);
     setCurrentCall(null);
     setDataConn(null);
     setIsScreenSharing(false);
@@ -261,6 +301,33 @@ export default function DemoCallPage() {
     alert(
       "New meeting created. Your meeting code has been copied. Share it with a friend to join.",
     );
+  };
+
+  const handleLogout = () => {
+    logoutUser();
+    router.push("/login");
+  };
+
+  useEffect(() => {
+    let timer: NodeJS.Timeout | null = null;
+    if (isConnected) {
+      timer = setInterval(() => {
+        setElapsedSeconds((current) => current + 1);
+      }, 1000);
+    }
+    return () => {
+      if (timer) clearInterval(timer);
+    };
+  }, [isConnected]);
+
+  const formatElapsedTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60)
+      .toString()
+      .padStart(2, "0");
+    const secs = Math.floor(seconds % 60)
+      .toString()
+      .padStart(2, "0");
+    return `${mins}:${secs}`;
   };
 
   // Toggles
@@ -344,6 +411,45 @@ export default function DemoCallPage() {
     }
   };
 
+  const handleFileSelection = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0] || null;
+    setSelectedFile(file);
+  };
+
+  const sendFile = () => {
+    if (!selectedFile || !dataConn) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const fileData = reader.result as string;
+      const payload = {
+        type: "file",
+        fileName: selectedFile.name,
+        fileType: selectedFile.type,
+        fileData,
+      };
+      dataConn.send(payload);
+      setMessages((prev) => [
+        ...prev,
+        {
+          text: `Sent file: ${selectedFile.name}`,
+          sender: "You",
+          time: new Date().toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+          }),
+          isFile: true,
+          fileName: selectedFile.name,
+          fileUrl: fileData,
+        },
+      ]);
+      setSelectedFile(null);
+      setTransferNotice(`Sent ${selectedFile.name}`);
+      setTimeout(() => setTransferNotice(""), 3000);
+    };
+    reader.readAsDataURL(selectedFile);
+  };
+
   const toggleTranslation = () => {
     if (isTranslating) {
       recognitionRef.current?.stop();
@@ -362,6 +468,7 @@ export default function DemoCallPage() {
           for (let i = event.resultIndex; i < event.results.length; i++) {
             transcript += event.results[i][0].transcript;
           }
+          setCaption(transcript);
           if (dataConn) dataConn.send({ type: "caption", text: transcript });
         };
 
@@ -395,13 +502,27 @@ export default function DemoCallPage() {
           >
             <ArrowLeft className="w-5 h-5 text-slate-900" />
           </Link>
-          <div className="font-semibold flex items-center gap-2 text-sm md:text-base text-slate-900">
-            Secure Video Call
+          <div className="space-y-1">
+            <p className="text-sm font-semibold text-slate-900">
+              Secure Video Call
+            </p>
+            <p className="text-xs text-slate-500">
+              {roomCode
+                ? `Room: ${roomCode}`
+                : "Create or paste a code to connect"}
+            </p>
           </div>
         </div>
 
-        {/* Copy ID Button */}
         <div className="flex items-center gap-2">
+          {currentUser ? (
+            <div className="hidden sm:inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white/80 px-3 py-2 text-xs text-slate-700">
+              <span>{currentUser.name}</span>
+              <span className="bg-cyan-100 text-cyan-700 rounded-full px-2 py-0.5">
+                Live
+              </span>
+            </div>
+          ) : null}
           {peerId ? (
             <button
               onClick={copyToClipboard}
@@ -481,7 +602,10 @@ export default function DemoCallPage() {
                     </div>
                   </div>
                   <div className="text-xs text-center mt-2 text-indigo-700 bg-indigo-100 py-2 rounded-lg border border-indigo-200 font-medium">
-                    Status: {connectionStatus}
+                    Status: {connectionStatus} •{" "}
+                    {remoteConnected
+                      ? `Live • ${formatElapsedTime(elapsedSeconds)}`
+                      : "Waiting for peer"}
                   </div>
                 </div>
               )}
@@ -500,14 +624,17 @@ export default function DemoCallPage() {
                 playsInline
                 className="w-full h-full object-cover"
               />
-              {!isConnected && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-4 text-center bg-slate-900/80">
-                  <VideoOff className="w-12 h-12 opacity-50" />
+              {(!isConnected || !remoteConnected) && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-4 text-center bg-slate-900/90">
+                  <div className="flex h-16 w-16 items-center justify-center rounded-full bg-slate-700/80 text-white text-xl">
+                    ?
+                  </div>
                   <span className="text-sm font-medium text-slate-200">
-                    Waiting for someone to join...
+                    Waiting for remote participant
                   </span>
-                  <span className="text-xs text-slate-400">
-                    Copy your ID and share it with a friend!
+                  <span className="text-xs text-slate-400 max-w-xs">
+                    Share the meeting code and invite others. Their video
+                    appears here once connected.
                   </span>
                 </div>
               )}
@@ -585,6 +712,45 @@ export default function DemoCallPage() {
           )}
 
           {/* Controls Bar - Bottom Floating */}
+          <div className="absolute top-6 right-6 hidden xl:flex flex-col gap-3 w-[260px] z-30">
+            <div className="rounded-3xl border border-white/10 bg-slate-950/95 p-4 shadow-2xl text-sm text-slate-200">
+              <p className="text-xs uppercase tracking-[0.35em] text-cyan-300 mb-3">
+                Meeting summary
+              </p>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-slate-300">
+                  <span>Local</span>
+                  <span className="text-white">
+                    {currentUser?.name || "You"}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-slate-300">
+                  <span>Remote</span>
+                  <span
+                    className={`text-sm font-semibold ${remoteConnected ? "text-emerald-300" : "text-slate-500"}`}
+                  >
+                    {remoteConnected ? "Connected" : "Waiting"}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-slate-300">
+                  <span>Elapsed</span>
+                  <span className="text-white">
+                    {formatElapsedTime(elapsedSeconds)}
+                  </span>
+                </div>
+              </div>
+            </div>
+            <div className="rounded-3xl border border-white/10 bg-slate-900/90 p-4 shadow-2xl text-slate-300">
+              <p className="text-xs uppercase tracking-[0.35em] text-cyan-300 mb-2">
+                Quick tips
+              </p>
+              <ul className="list-disc pl-4 text-xs space-y-2">
+                <li>Share your meeting code after camera ready.</li>
+                <li>Use chat to send quick links or file attachments.</li>
+                <li>Press Translate while speaking for live captions.</li>
+              </ul>
+            </div>
+          </div>
           <div className="absolute bottom-4 md:bottom-8 left-1/2 -translate-x-1/2 bg-black/80 backdrop-blur-xl border border-white/10 rounded-full flex items-center justify-center gap-2 md:gap-3 px-4 py-2 md:px-6 md:py-3 z-40 shadow-2xl w-[95%] md:w-auto overflow-x-auto no-scrollbar">
             <button
               onClick={toggleMic}
@@ -682,7 +848,17 @@ export default function DemoCallPage() {
                 <div
                   className={`px-3 py-2 rounded-xl max-w-[90%] text-sm break-words ${msg.sender === "You" ? "bg-indigo-600 text-white rounded-tr-sm" : "bg-white/10 text-gray-200 rounded-tl-sm"}`}
                 >
-                  {msg.text}
+                  {msg.isFile ? (
+                    <a
+                      href={msg.fileUrl}
+                      download={msg.fileName}
+                      className="underline text-cyan-200 hover:text-cyan-100"
+                    >
+                      {msg.fileName || "Download file"}
+                    </a>
+                  ) : (
+                    msg.text
+                  )}
                 </div>
               </div>
             ))}
@@ -690,23 +866,51 @@ export default function DemoCallPage() {
           </div>
 
           <div className="p-3 border-t border-white/10 bg-black/50 shrink-0">
-            <div className="flex items-center bg-white/5 rounded-xl border border-white/10 p-1 focus-within:border-indigo-500/50 transition-colors">
-              <input
-                type="text"
-                value={chatInput}
-                onChange={(e) => setChatInput(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && sendChatMessage()}
-                disabled={!isConnected}
-                placeholder="Type message..."
-                className="flex-1 bg-transparent border-none outline-none px-3 py-2 text-sm text-white placeholder:text-gray-500 disabled:opacity-50 min-w-0"
-              />
-              <button
-                onClick={sendChatMessage}
-                disabled={!isConnected || !chatInput.trim()}
-                className="p-2 text-white bg-indigo-600 hover:bg-indigo-500 rounded-lg disabled:opacity-50 transition-colors shrink-0"
-              >
-                <Send className="w-4 h-4" />
-              </button>
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <label className="cursor-pointer rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-slate-100 hover:bg-white/10 transition-colors">
+                  Select file
+                  <input
+                    type="file"
+                    accept="*/*"
+                    onChange={handleFileSelection}
+                    className="hidden"
+                  />
+                </label>
+                <button
+                  onClick={sendFile}
+                  disabled={!isConnected || !selectedFile}
+                  className="rounded-2xl bg-cyan-500 px-4 py-3 text-sm font-semibold text-slate-950 hover:bg-cyan-400 transition-colors disabled:opacity-50"
+                >
+                  Send file
+                </button>
+                {selectedFile && (
+                  <span className="text-xs text-slate-300 truncate max-w-[160px]">
+                    {selectedFile.name}
+                  </span>
+                )}
+              </div>
+              {transferNotice && (
+                <p className="text-xs text-emerald-300">{transferNotice}</p>
+              )}
+              <div className="flex items-center bg-white/5 rounded-xl border border-white/10 p-1 focus-within:border-indigo-500/50 transition-colors">
+                <input
+                  type="text"
+                  value={chatInput}
+                  onChange={(e) => setChatInput(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && sendChatMessage()}
+                  disabled={!isConnected}
+                  placeholder="Type message..."
+                  className="flex-1 bg-transparent border-none outline-none px-3 py-2 text-sm text-white placeholder:text-gray-500 disabled:opacity-50 min-w-0"
+                />
+                <button
+                  onClick={sendChatMessage}
+                  disabled={!isConnected || !chatInput.trim()}
+                  className="p-2 text-white bg-indigo-600 hover:bg-indigo-500 rounded-lg disabled:opacity-50 transition-colors shrink-0"
+                >
+                  <Send className="w-4 h-4" />
+                </button>
+              </div>
             </div>
           </div>
         </div>

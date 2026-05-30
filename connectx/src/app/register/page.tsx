@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { getCurrentUser, registerUser } from "@/lib/auth";
 
 export default function RegisterPage() {
   const [name, setName] = useState("");
@@ -15,6 +16,13 @@ export default function RegisterPage() {
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
 
+  useEffect(() => {
+    const currentUser = getCurrentUser();
+    if (currentUser) {
+      router.push("/dashboard");
+    }
+  }, [router]);
+
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     if (password !== confirmPassword) {
@@ -26,23 +34,16 @@ export default function RegisterPage() {
     setError("");
 
     try {
-      const res = await fetch("http://localhost:5000/api/register", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, email, password, phone, avatar }),
+      await registerUser({
+        name: name.trim(),
+        email: email.trim(),
+        password,
+        phone: phone.trim(),
+        avatar: avatar.trim(),
       });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.error || "Failed to register");
-      }
-
-      // Save user to local storage and redirect
-      localStorage.setItem("user", JSON.stringify(data.user));
       router.push("/dashboard");
     } catch (err: any) {
-      setError(err.message);
+      setError(err.message || "Failed to register");
     } finally {
       setIsLoading(false);
     }

@@ -11,6 +11,7 @@ This repository contains the CONNECTX project, including a Next.js frontend in `
 ## Setup
 
 ### Frontend
+
 ```bash
 cd connectx
 npm install
@@ -18,6 +19,7 @@ npm run dev
 ```
 
 ### Backend
+
 ```bash
 cd backend
 npm install
