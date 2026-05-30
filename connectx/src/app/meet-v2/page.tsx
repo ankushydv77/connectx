@@ -6,7 +6,6 @@ import io, { Socket } from "socket.io-client";
 import { WaitingRoom } from "@/app/components/WaitingRoom";
 import { VideoCallInterface } from "@/app/components/VideoCallInterface";
 import { CaptionDisplay, Caption } from "@/app/components/CaptionDisplay";
-import { TranslationControls } from "@/app/components/TranslationControls";
 import { MeetingChat, ChatMessage } from "@/app/components/MeetingChat";
 import { HandRaiseManager } from "@/app/components/HandRaiseManager";
 import { ReactionDisplay, ReactionButtons, REACTION_EMOJIS } from "@/app/components/ReactionEmojis";
@@ -1452,6 +1451,16 @@ export default function ImprovedMeetPage() {
             onLowerHand={handleLowerHand}
             onSendReaction={handleSendReaction}
             isGuest={!!currentUser?.isGuest}
+            isListening={isListening}
+            selectedLanguage={selectedLanguage}
+            isSpeechSupported={isSpeechSupported}
+            onStartListening={startListening}
+            onStopListening={stopListening}
+            onLanguageChange={(lang) => {
+              setSelectedLanguage(lang);
+              changeLanguage(lang);
+            }}
+            translationEnabled={translationEnabled}
           />
 
           {/* Caption Display (Premium Logged In Users Only) */}
@@ -1464,23 +1473,7 @@ export default function ImprovedMeetPage() {
             />
           )}
 
-          {/* Translation Controls (Premium Logged In Users Only) */}
-          {!currentUser?.isGuest && (
-            <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-40">
-              <TranslationControls
-                isListening={isListening}
-                selectedLanguage={selectedLanguage}
-                isSupported={isSpeechSupported}
-                onStartListening={startListening}
-                onStopListening={stopListening}
-                onLanguageChange={(lang) => {
-                  setSelectedLanguage(lang);
-                  changeLanguage(lang);
-                }}
-                disabled={!translationEnabled}
-              />
-            </div>
-          )}
+
 
           {/* Floating Reactions Display */}
           <ReactionDisplay reactions={floatingReactions} />

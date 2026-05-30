@@ -23,6 +23,7 @@ import { ParticipantGrid } from "./ParticipantGrid";
 import { FileShareButton } from "./FileShareButton";
 import { FileTransferProgress } from "./FileTransferProgress";
 import { ReactionButtons } from "./ReactionEmojis";
+import { TranslationControls } from "./TranslationControls";
 
 interface Participant {
   socketId: string;
@@ -77,6 +78,13 @@ interface VideoCallInterfaceProps {
   onLowerHand?: () => void;
   onSendReaction?: (emoji: string) => void;
   isGuest?: boolean;
+  isListening?: boolean;
+  selectedLanguage?: string;
+  isSpeechSupported?: boolean;
+  onStartListening?: () => void;
+  onStopListening?: () => void;
+  onLanguageChange?: (language: string) => void;
+  translationEnabled?: boolean;
 }
 
 export function VideoCallInterface({
@@ -104,6 +112,13 @@ export function VideoCallInterface({
   onLowerHand = () => {},
   onSendReaction = () => {},
   isGuest = false,
+  isListening = false,
+  selectedLanguage = "en-US",
+  isSpeechSupported = false,
+  onStartListening,
+  onStopListening,
+  onLanguageChange,
+  translationEnabled = true,
 }: VideoCallInterfaceProps) {
   const [viewMode, setViewMode] = useState<"gallery" | "speaker">("gallery");
   const [isCopied, setIsCopied] = useState(false);
@@ -400,6 +415,19 @@ export function VideoCallInterface({
             >
               <Files className="w-5 h-5 sm:w-6 h-6" />
             </button>
+          )}
+
+          {/* Translation Controls (Speech Recognition & Language Selector) */}
+          {!isGuest && onStartListening && onStopListening && onLanguageChange && (
+            <TranslationControls
+              isListening={isListening}
+              selectedLanguage={selectedLanguage}
+              isSupported={isSpeechSupported}
+              onStartListening={onStartListening}
+              onStopListening={onStopListening}
+              onLanguageChange={onLanguageChange}
+              disabled={!translationEnabled}
+            />
           )}
 
           {/* Leave Call */}

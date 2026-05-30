@@ -67,7 +67,7 @@ export function TranslationControls({
         </button>
 
         {showLanguageMenu && (
-          <div className="absolute top-full mt-2 left-0 bg-slate-800 border border-slate-700 rounded-lg shadow-lg py-1 min-w-48 z-50">
+          <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-slate-800 border border-slate-700 rounded-lg shadow-lg py-1 min-w-48 z-50 max-h-60 overflow-y-auto">
             {Object.entries(SUPPORTED_LANGUAGES).map(([code, name]) => (
               <button
                 key={code}
