@@ -68,14 +68,28 @@ export function WaitingRoom({
           return;
         }
 
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: true,
-          audio: isMicOn,
-        });
-        streamRef.current = stream;
-        setLobbyStream(stream);
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({
+            video: true,
+            audio: isMicOn,
+          });
+          streamRef.current = stream;
+          setLobbyStream(stream);
+        } catch (videoErr) {
+          console.warn("Lobby: Failed to access camera, trying audio-only fallback:", videoErr);
+          try {
+            const stream = await navigator.mediaDevices.getUserMedia({
+              video: false,
+              audio: isMicOn,
+            });
+            streamRef.current = stream;
+            setLobbyStream(stream);
+          } catch (audioErr) {
+            console.error("Lobby: Failed to access audio too:", audioErr);
+          }
+        }
       } catch (err) {
-        console.error("Failed to access camera:", err);
+        console.error("Failed to initialize lobby devices:", err);
       }
     };
 

@@ -354,9 +354,47 @@ export default function ImprovedMeetPage() {
 
         return stream;
       } catch (err) {
-        console.error("Failed to get local stream:", err);
-        alert("Failed to access camera/microphone. Please check permissions.");
-        return null;
+        console.warn("Failed to get video+audio stream, trying audio-only fallback:", err);
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({
+            video: false,
+            audio: true,
+          });
+          
+          if (!isMicOnRef.current) {
+            stream.getAudioTracks().forEach((track) => (track.enabled = false));
+          }
+
+          setIsVideoOn(false); // Force camera state off
+          localStreamRef.current = stream;
+          setMyStream(stream);
+
+          if (socketRef.current) {
+            socketRef.current.emit("update_participant_state", {
+              roomId,
+              isMuted: !isMicOn,
+              isVideoOff: true,
+            });
+          }
+          return stream;
+        } catch (audioErr) {
+          console.error("Failed to get audio-only stream too, falling back to empty stream:", audioErr);
+          
+          const emptyStream = new MediaStream();
+          setIsVideoOn(false);
+          setIsMicOn(false);
+          localStreamRef.current = emptyStream;
+          setMyStream(emptyStream);
+
+          if (socketRef.current) {
+            socketRef.current.emit("update_participant_state", {
+              roomId,
+              isMuted: true,
+              isVideoOff: true,
+            });
+          }
+          return emptyStream;
+        }
       } finally {
         localStreamPromiseRef.current = null;
       }
