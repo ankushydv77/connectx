@@ -63,7 +63,8 @@ export default function ChatPage() {
 
   useEffect(() => {
     // Connect to backend
-    const newSocket = io("http://localhost:5000");
+    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
+    const newSocket = io(backendUrl);
     setSocket(newSocket);
 
     newSocket.on("connect", () => {

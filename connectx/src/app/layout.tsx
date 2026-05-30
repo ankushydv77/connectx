@@ -10,7 +10,7 @@ export const metadata: Metadata = {
   keywords: "google meet clone, video call, meeting, next.js",
 };
 
-import Navbar from "./components/Navbar";
+import LayoutWrapper from "./components/LayoutWrapper";
 
 export default function RootLayout({
   children,
@@ -20,8 +20,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${inter.className} antialiased`}>
-        <Navbar />
-        <div className="pt-28">{children}</div>
+        <LayoutWrapper>{children}</LayoutWrapper>
       </body>
     </html>
   );

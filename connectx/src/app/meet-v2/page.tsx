@@ -1550,7 +1550,7 @@ export default function ImprovedMeetPage() {
 
         {/* Sidebar Container */}
         {activeSidebar !== "none" && (
-          <div className="w-full sm:w-80 h-screen flex-shrink-0 z-30 fixed sm:relative right-0 top-0 shadow-2xl">
+          <div className="w-full sm:w-80 h-screen flex-shrink-0 z-30 fixed sm:relative right-0 top-0 pt-12 sm:pt-0 shadow-2xl">
             {activeSidebar === "chat" && (
               <MeetingChat
                 messages={chatMessages}

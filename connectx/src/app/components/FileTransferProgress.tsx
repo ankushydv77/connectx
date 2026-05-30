@@ -35,11 +35,11 @@ export function FileTransferProgress({
   if (files.length === 0) return null;
 
   return (
-    <div className="fixed bottom-24 right-4 space-y-2 z-40">
+    <div className="fixed bottom-24 right-4 left-4 sm:left-auto sm:w-80 space-y-2 z-40">
       {files.map((file) => (
         <div
           key={file.fileId}
-          className="bg-slate-800 border border-slate-700 rounded-lg p-4 w-80 shadow-lg"
+          className="bg-slate-800 border border-slate-700 rounded-lg p-4 w-full sm:w-80 shadow-lg"
         >
           {/* Header */}
           <div className="flex items-start justify-between mb-2">
