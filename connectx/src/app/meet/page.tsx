@@ -91,7 +91,7 @@ export default function MeetPage() {
                 {room || "New meeting"}
               </h1>
               <p className="mt-3 text-slate-400 max-w-2xl">
-                A simplified Google Meet clone meeting page. Enter your name,
+                A premium ConnectX video meeting page. Enter your name,
                 turn on your camera, and join the room.
               </p>
             </div>

@@ -5,9 +5,9 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
 export const metadata: Metadata = {
-  title: "Google Meet Clone",
-  description: "A simplified Google Meet clone built with Next.js.",
-  keywords: "google meet clone, video call, meeting, next.js",
+  title: "ConnectX - Premium Video Meetings & Real-Time Collaboration",
+  description: "ConnectX provides high-quality video meetings, real-time translations, and interactive collaboration features.",
+  keywords: "connectx, video call, meeting, translation, real-time collaboration, next.js",
 };
 
 import LayoutWrapper from "./components/LayoutWrapper";

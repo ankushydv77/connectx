@@ -98,7 +98,7 @@ export default function Home() {
                 </div>
               )}
 
-              {/* Signature Google Meet Styled Input & Button row */}
+              {/* Signature ConnectX Styled Input & Button row */}
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 pt-2">
                 {/* New Meeting Button */}
                 <button
